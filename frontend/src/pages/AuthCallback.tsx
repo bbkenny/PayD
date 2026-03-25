@@ -1,20 +1,21 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../providers/AuthContext';
 
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   useEffect(() => {
     const token = searchParams.get('token');
     if (token) {
-      localStorage.setItem('payd_auth_token', token);
-      // Optional: decode token to get user info or trigger a refresh in a context provider
+      login(token);
       void navigate('/');
     } else {
       void navigate('/login?error=no_token');
     }
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, login]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh]">
