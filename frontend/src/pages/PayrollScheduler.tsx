@@ -12,12 +12,98 @@ import { SchedulingWizard } from '../components/SchedulingWizard';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { BulkPaymentStatusTracker } from '../components/BulkPaymentStatusTracker';
 
+import { ContractErrorPanel } from '../components/ContractErrorPanel';
+import { parseContractError, type ContractErrorDetail } from '../utils/contractErrorParser';
+import { HelpLink } from '../components/HelpLink';
+
 interface PayrollFormState {
   employeeName: string;
   amount: string;
   frequency: 'weekly' | 'monthly';
   startDate: string;
   memo?: string;
+}
+
+type SchedulingFrequency = 'weekly' | 'biweekly' | 'monthly';
+
+interface EmployeePreference {
+  id: string;
+  name: string;
+  amount: string;
+  currency: string;
+}
+
+interface SchedulingConfig {
+  frequency: SchedulingFrequency;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  timeOfDay: string; // HH:mm
+  preferences: EmployeePreference[];
+}
+
+function parseTimeOfDay(time: string) {
+  const [hhRaw, mmRaw] = time.split(':');
+  const hh = Number.parseInt(hhRaw ?? '0', 10);
+  const mm = Number.parseInt(mmRaw ?? '0', 10);
+  return {
+    hours: Number.isFinite(hh) ? hh : 0,
+    minutes: Number.isFinite(mm) ? mm : 0,
+  };
+}
+
+function clampDayOfMonth(year: number, monthIndex: number, desired: number) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return Math.max(1, Math.min(desired, lastDay));
+}
+
+function computeNextRunDate(config: SchedulingConfig, from: Date = new Date()): Date {
+  const { hours, minutes } = parseTimeOfDay(config.timeOfDay);
+
+  if (config.frequency === 'monthly') {
+    const desiredDay = config.dayOfMonth || 1;
+
+    const year = from.getFullYear();
+    const monthIndex = from.getMonth();
+
+    let candidate = new Date(
+      year,
+      monthIndex,
+      clampDayOfMonth(year, monthIndex, desiredDay),
+      hours,
+      minutes,
+      0,
+      0
+    );
+
+    if (candidate.getTime() <= from.getTime()) {
+      const nextMonthIndex = monthIndex + 1;
+      candidate = new Date(
+        year,
+        nextMonthIndex,
+        clampDayOfMonth(year, nextMonthIndex, desiredDay),
+        hours,
+        minutes,
+        0,
+        0
+      );
+    }
+
+    return candidate;
+  }
+
+  // weekly / biweekly
+  const dayOfWeek = config.dayOfWeek ?? 1; // default Monday
+  const diffDays = (dayOfWeek - from.getDay() + 7) % 7;
+
+  const first = new Date(from);
+  first.setDate(from.getDate() + diffDays);
+  first.setHours(hours, minutes, 0, 0);
+
+  if (diffDays === 0 && first.getTime() <= from.getTime()) {
+    first.setDate(first.getDate() + 7);
+  }
+
+  return first;
 }
 
 const formatDate = (dateString: string) => {
@@ -53,16 +139,17 @@ const initialFormState: PayrollFormState = {
 
 export default function PayrollScheduler() {
   const { t } = useTranslation();
-  const { notifySuccess, notifyError } = useNotification();
+  const { notifySuccess, notify, notifyPaymentSuccess, notifyPaymentFailure, notifyApiError } =
+    useNotification();
   const { socket, subscribeToTransaction, unsubscribeFromTransaction } = useSocket();
   const [formData, setFormData] = useState<PayrollFormState>(initialFormState);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [activeSchedule, setActiveSchedule] = useState<{
-    frequency: string;
-    timeOfDay: string;
-  } | null>(null);
+  const [activeSchedule, setActiveSchedule] = useState<SchedulingConfig | null>(null);
   const [nextRunDate, setNextRunDate] = useState<Date | null>(null);
+  const [contractError, setContractError] = useState<ContractErrorDetail | null>(null);
+
+  const scheduleStorageKey = 'payd-scheduler-config';
 
   const [pendingClaims, setPendingClaims] = useState<PendingClaim[]>(() => {
     const saved = localStorage.getItem('pending-claims');
@@ -94,10 +181,32 @@ export default function PayrollScheduler() {
     const saved = loadSavedData();
     if (saved) {
       setFormData(saved);
+      notify('Recovered unsaved payroll draft');
     }
-  }, [loadSavedData]);
+  }, [loadSavedData, notify]);
 
-  const handleScheduleComplete = (config: { frequency: string; timeOfDay: string }) => {
+  // Restore confirmed schedule (persisted locally after wizard confirmation).
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(scheduleStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SchedulingConfig;
+
+      if (!parsed?.frequency || !parsed?.timeOfDay) return;
+      if (!['weekly', 'biweekly', 'monthly'].includes(parsed.frequency)) return;
+      if (!Array.isArray(parsed.preferences)) return;
+
+      const next = computeNextRunDate(parsed, new Date());
+      setActiveSchedule(parsed);
+      setNextRunDate(next);
+    } catch {
+      // Ignore invalid local storage payloads.
+    }
+  }, []);
+
+  const handleScheduleComplete = (config: SchedulingConfig) => {
+    // SchedulingWizard calls back with the full SchedulingConfig, but the current type in
+    // this file is intentionally loose to avoid coupling to the component's internal type.
     setActiveSchedule(config);
     setIsWizardOpen(false);
     notifySuccess(
@@ -105,13 +214,10 @@ export default function PayrollScheduler() {
       `Frequency: ${config.frequency}, time: ${config.timeOfDay}`
     );
 
-    // Compute next run for countdown demo
-    const d = new Date();
-    if (config.frequency === 'monthly') d.setMonth(d.getMonth() + 1);
-    else if (config.frequency === 'weekly') d.setDate(d.getDate() + 7);
-    else d.setDate(d.getDate() + 14);
+    // Persist config so the countdown survives refresh.
+    localStorage.setItem(scheduleStorageKey, JSON.stringify(config));
 
-    setNextRunDate(d);
+    setNextRunDate(computeNextRunDate(config, new Date()));
   };
 
   const handleChange = (
@@ -119,7 +225,10 @@ export default function PayrollScheduler() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (simulationResult) resetSimulation();
+    if (simulationResult) {
+      resetSimulation();
+      setContractError(null);
+    }
   };
 
   useEffect(() => {
@@ -134,7 +243,7 @@ export default function PayrollScheduler() {
       );
 
       if (data.status === 'confirmed') {
-        notifySuccess('Payment confirmed!', `TX: ${data.transactionId}`);
+        notifyPaymentSuccess(data.transactionId, 'Payment confirmed!');
       }
     };
 
@@ -143,23 +252,34 @@ export default function PayrollScheduler() {
     return () => {
       socket.off('transaction:update', handleTransactionUpdate);
     };
-  }, [socket, notifySuccess]);
+  }, [socket, notifyPaymentSuccess]);
 
   const handleInitialize = async () => {
     if (!formData.employeeName || !formData.amount) {
-      notifyError('Missing required fields', 'Please provide employee name and amount.');
+      setContractError({
+        code: 'MISSING_FIELDS',
+        message: 'Missing required fields',
+        suggestedAction: 'Please provide employee name and amount.',
+      });
       return;
     }
+
+    setContractError(null);
 
     // Mock XDR for simulation demonstration
     const mockXdr =
       'AAAAAgAAAABmF8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
 
-    await simulate({ envelopeXdr: mockXdr });
+    const result = await simulate({ envelopeXdr: mockXdr });
+    if (result && !result.success) {
+      const parsed = parseContractError(result.envelopeXdr, result.description);
+      setContractError(parsed);
+    }
   };
 
   const handleBroadcast = async () => {
     setIsBroadcasting(true);
+    setContractError(null);
     try {
       const mockRecipientPublicKey = generateWallet().publicKey;
 
@@ -216,6 +336,10 @@ export default function PayrollScheduler() {
           }),
         });
       } catch {
+        notifyApiError(
+          'Webhook trigger failed',
+          'Payment was created, but webhook test trigger failed.'
+        );
         console.warn('Webhook test-trigger skipped (Backend might not be running)');
       }
 
@@ -223,7 +347,12 @@ export default function PayrollScheduler() {
       setFormData(initialFormState);
     } catch (err) {
       console.error(err);
-      notifyError('Broadcast failed', 'Please check your network connection and try again.');
+      const parsed = parseContractError(
+        undefined,
+        err instanceof Error ? err.message : 'Broadcast failed'
+      );
+      setContractError(parsed);
+      notifyPaymentFailure(parsed.message);
     } finally {
       setIsBroadcasting(false);
     }
@@ -240,9 +369,15 @@ export default function PayrollScheduler() {
     <div className="flex-1 flex flex-col items-center justify-start p-12 max-w-6xl mx-auto w-full">
       <div className="w-full mb-12 flex items-end justify-between border-b border-hi pb-8">
         <div>
-          <Heading as="h1" size="lg" weight="bold" addlClassName="mb-2 tracking-tight">
+          <Heading
+            as="h1"
+            size="lg"
+            weight="bold"
+            addlClassName="mb-2 tracking-tight flex items-center gap-3"
+          >
             {t('payroll.title', 'Workforce')}{' '}
             <span className="text-accent">{t('payroll.titleHighlight', 'Scheduler')}</span>
+            <HelpLink topic="schedule payroll" variant="icon" size="sm" />
           </Heading>
           <Text
             as="p"
@@ -404,11 +539,16 @@ export default function PayrollScheduler() {
           </div>
 
           <div className="lg:col-span-2 flex flex-col gap-6">
+            <ContractErrorPanel error={contractError} onClear={() => setContractError(null)} />
+
             <TransactionSimulationPanel
               result={simulationResult}
               isSimulating={isSimulating}
               processError={simulationProcessError}
-              onReset={resetSimulation}
+              onReset={() => {
+                resetSimulation();
+                setContractError(null);
+              }}
             />
 
             <div className="card glass noise h-fit">
@@ -428,6 +568,7 @@ export default function PayrollScheduler() {
                   <line x1="12" y1="8" x2="12.01" y2="8" />
                 </svg>
                 Pre-flight Validation
+                <HelpLink topic="transaction simulation" variant="icon" size="sm" />
               </Heading>
               <Text
                 as="p"

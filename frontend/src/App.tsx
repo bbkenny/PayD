@@ -19,6 +19,7 @@ import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import { useTranslation } from 'react-i18next';
 import { contractService } from './services/contracts';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   const { t } = useTranslation();
@@ -36,139 +37,163 @@ function App() {
         <Route
           path="/"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title={t('errorFallback.homeTitle')}
-                  description={t('errorFallback.homeDescription')}
-                />
-              }
-            >
-              <Home />
-            </ErrorBoundary>
+            <ProtectedRoute>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title={t('errorFallback.homeTitle')}
+                    description={t('errorFallback.homeDescription')}
+                  />
+                }
+              >
+                <Home />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/payroll"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title={t('errorFallback.payrollTitle')}
-                  description={t('errorFallback.payrollDescription')}
-                />
-              }
-            >
-              <PayrollScheduler />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title={t('errorFallback.payrollTitle')}
+                    description={t('errorFallback.payrollDescription')}
+                  />
+                }
+              >
+                <PayrollScheduler />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/employee"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title={t('errorFallback.employeesTitle')}
-                  description={t('errorFallback.employeesDescription')}
-                />
-              }
-            >
-              <EmployeeEntry />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title={t('errorFallback.employeesTitle')}
+                    description={t('errorFallback.employeesDescription')}
+                  />
+                }
+              >
+                <EmployeeEntry />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/portal"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title="Employee Portal Error"
-                  description="Something went wrong loading your portal."
-                />
-              }
-            >
-              <EmployeePortal />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employee']}>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title="Employee Portal Error"
+                    description="Something went wrong loading your portal."
+                  />
+                }
+              >
+                <EmployeePortal />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/reports"
           element={
-            <ErrorBoundary fallback={<ErrorFallback />}>
-              <CustomReportBuilder />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary fallback={<ErrorFallback />}>
+                <CustomReportBuilder />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/debug"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title={t('errorFallback.debuggerTitle')}
-                  description={t('errorFallback.debuggerDescription')}
-                />
-              }
-            >
-              <Debugger />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title={t('errorFallback.debuggerTitle')}
+                    description={t('errorFallback.debuggerDescription')}
+                  />
+                }
+              >
+                <Debugger />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/debug/:contractName"
           element={
-            <ErrorBoundary
-              fallback={
-                <ErrorFallback
-                  title={t('errorFallback.debuggerTitle')}
-                  description={t('errorFallback.debuggerDescription')}
-                />
-              }
-            >
-              <Debugger />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary
+                fallback={
+                  <ErrorFallback
+                    title={t('errorFallback.debuggerTitle')}
+                    description={t('errorFallback.debuggerDescription')}
+                  />
+                }
+              >
+                <Debugger />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/settings"
           element={
-            <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-              <Settings />
-            </ErrorBoundary>
+            <ProtectedRoute>
+              <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
+                <Settings />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/help"
           element={
-            <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-              <HelpCenter />
-            </ErrorBoundary>
+            <ProtectedRoute>
+              <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
+                <HelpCenter />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/cross-asset-payment"
           element={
-            <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-              <CrossAssetPayment />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
+                <CrossAssetPayment />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/transactions"
           element={
-            <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-              <TransactionHistory />
-            </ErrorBoundary>
+            <ProtectedRoute>
+              <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
+                <TransactionHistory />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/revenue-split"
           element={
-            <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-              <RevenueSplitDashboard />
-            </ErrorBoundary>
+            <ProtectedRoute allowedRoles={['employer']}>
+              <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
+                <RevenueSplitDashboard />
+              </ErrorBoundary>
+            </ProtectedRoute>
           }
         />
         <Route path="/login" element={<Login />} />

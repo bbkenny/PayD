@@ -8,9 +8,10 @@ import { WalletProvider } from './providers/WalletProvider.tsx';
 import { NotificationProvider } from './providers/NotificationProvider.tsx';
 import { SocketProvider } from './providers/SocketProvider.tsx';
 import { ThemeProvider } from './providers/ThemeProvider.tsx';
+import { AuthProvider } from './providers/AuthContext.tsx';
 import * as Sentry from '@sentry/react';
-import ErrorBoundary from './components/ErrorBoundary';
-import ErrorFallback from './components/ErrorFallback';
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import PageErrorFallback from './components/PageErrorFallback';
 import './i18n';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
@@ -25,24 +26,33 @@ if (import.meta.env.MODE === 'production' && sentryDsn) {
   });
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30000,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <NotificationProvider>
-          <SocketProvider>
-            <WalletProvider>
-              <BrowserRouter>
-                <ErrorBoundary fallback={<ErrorFallback onReset={() => {}} />}>
-                  <App />
-                </ErrorBoundary>
-              </BrowserRouter>
-            </WalletProvider>
-          </SocketProvider>
-        </NotificationProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <NotificationProvider>
+            <SocketProvider>
+              <WalletProvider>
+                <BrowserRouter>
+                  <GlobalErrorBoundary fallback={<PageErrorFallback />}>
+                    <App />
+                  </GlobalErrorBoundary>
+                </BrowserRouter>
+              </WalletProvider>
+            </SocketProvider>
+          </NotificationProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   </React.StrictMode>
 );

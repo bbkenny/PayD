@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import {
   Code,
@@ -14,102 +14,131 @@ import {
   PieChart,
 } from 'lucide-react';
 import { Avatar } from './Avatar';
+import { AvatarUpload } from './AvatarUpload';
+import { useWallet } from '../hooks/useWallet';
+import { useAuth } from '../providers/AuthContext';
+import { LogOut } from 'lucide-react';
 
 const AppNav: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isProfileEditorOpen, setIsProfileEditorOpen] = useState(false);
+  const [userImageUrl, setUserImageUrl] = useState<string | undefined>(undefined);
+  const { address, walletName, isConnecting } = useWallet();
+  const { user, logout } = useAuth();
 
-  // Mock user data - replace with actual user context
+  useEffect(() => {
+    const savedImage = localStorage.getItem('payd:user-avatar');
+    if (savedImage) {
+      setUserImageUrl(savedImage);
+    }
+  }, []);
+
+  if (!user) return null;
+
   const currentUser = {
-    email: 'user@example.com',
-    name: 'John Doe',
-    imageUrl: undefined,
+    email: user.email,
+    name: user.email.split('@')[0], // Fallback if name is not in JWT
+    imageUrl: userImageUrl,
   };
+
+  const isEmployer = user.role === 'employer';
+  const isEmployee = user.role === 'employee';
 
   const navLinks = (
     <>
-      <NavLink
-        to="/payroll"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
-      >
-        <span className="opacity-70">
-          <Wallet className="w-4 h-4" />
-        </span>
-        <span className="hidden sm:inline">Payroll</span>
-      </NavLink>
+      {isEmployer && (
+        <>
+          <NavLink
+            to="/payroll"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+                isActive
+                  ? 'text-(--accent) bg-white/5'
+                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+              }`
+            }
+            onClick={() => setMobileOpen(false)}
+          >
+            <span className="opacity-70">
+              <Wallet className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline">Payroll</span>
+          </NavLink>
 
-      <NavLink
-        to="/employee"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
-      >
-        <span className="opacity-70">
-          <User className="w-4 h-4" />
-        </span>
-        <span className="hidden sm:inline">Employees</span>
-      </NavLink>
+          <NavLink
+            to="/employee"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+                isActive
+                  ? 'text-(--accent) bg-white/5'
+                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+              }`
+            }
+            onClick={() => setMobileOpen(false)}
+          >
+            <span className="opacity-70">
+              <User className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline">Employees</span>
+          </NavLink>
+        </>
+      )}
 
-      <NavLink
-        to="/portal"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-      >
-        <span className="opacity-70">
-          <LayoutDashboard className="w-4 h-4" />
-        </span>
-        My Portal
-      </NavLink>
+      {isEmployee && (
+        <NavLink
+          to="/portal"
+          className={({ isActive }) =>
+            `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+              isActive
+                ? 'text-(--accent) bg-white/5'
+                : 'text-(--muted) hover:bg-white/10 hover:text-white'
+            }`
+          }
+        >
+          <span className="opacity-70">
+            <LayoutDashboard className="w-4 h-4" />
+          </span>
+          My Portal
+        </NavLink>
+      )}
 
-      <NavLink
-        to="/reports"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
-      >
-        <span className="opacity-70">
-          <FileText className="w-4 h-4" />
-        </span>
-        <span className="hidden sm:inline">Reports</span>
-      </NavLink>
+      {isEmployer && (
+        <>
+          <NavLink
+            to="/reports"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+                isActive
+                  ? 'text-(--accent) bg-white/5'
+                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+              }`
+            }
+            onClick={() => setMobileOpen(false)}
+          >
+            <span className="opacity-70">
+              <FileText className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline">Reports</span>
+          </NavLink>
 
-      <NavLink
-        to="/cross-asset-payment"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
-      >
-        <span className="opacity-70">
-          <Globe className="w-4 h-4" />
-        </span>
-        <span className="hidden sm:inline">Cross-Asset</span>
-      </NavLink>
+          <NavLink
+            to="/cross-asset-payment"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+                isActive
+                  ? 'text-(--accent) bg-white/5'
+                  : 'text-(--muted) hover:bg-white/10 hover:text-white'
+              }`
+            }
+            onClick={() => setMobileOpen(false)}
+          >
+            <span className="opacity-70">
+              <Globe className="w-4 h-4" />
+            </span>
+            <span className="hidden sm:inline">Cross-Asset</span>
+          </NavLink>
+        </>
+      )}
 
       <NavLink
         to="/transactions"
@@ -127,57 +156,56 @@ const AppNav: React.FC = () => {
         History
       </NavLink>
 
-      <NavLink
-        to="/revenue-split"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-(--accent) bg-white/5'
-              : 'text-(--muted) hover:bg-white/10 hover:text-white'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
-      >
-        <span className="opacity-70">
-          <PieChart className="w-4 h-4" />
-        </span>
-        <span className="hidden sm:inline">Revenue Split</span>
-      </NavLink>
+      {isEmployer && (
+        <NavLink
+          to="/revenue-split"
+          className={({ isActive }) =>
+            `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
+              isActive
+                ? 'text-(--accent) bg-white/5'
+                : 'text-(--muted) hover:bg-white/10 hover:text-white'
+            }`
+          }
+          onClick={() => setMobileOpen(false)}
+        >
+          <span className="opacity-70">
+            <PieChart className="w-4 h-4" />
+          </span>
+          <span className="hidden sm:inline">Revenue Split</span>
+        </NavLink>
+      )}
 
       <div className="w-px h-5 bg-(--border-hi) mx-2" />
-      <NavLink
-        to="/admin"
-        className={({ isActive }) =>
-          `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition ${
-            isActive
-              ? 'text-red-500 bg-red-500/10'
-              : 'text-red-400 hover:bg-red-500/20 hover:text-red-500'
-          }`
-        }
-      >
-        <ShieldAlert className="w-4 h-4" />
-        Admin
-      </NavLink>
+      
+      {isEmployer && (
+        <NavLink
+          to="/debug"
+          className={({ isActive }) =>
+            `flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-mono tracking-wide border transition ${
+              isActive
+                ? 'text-(--accent2) bg-[rgba(124,111,247,0.06)] border-[rgba(124,111,247,0.25)]'
+                : 'text-(--accent2) bg-[rgba(124,111,247,0.06)] border-[rgba(124,111,247,0.25)] hover:bg-[rgba(124,111,247,0.12)]'
+            }`
+          }
+          onClick={() => setMobileOpen(false)}
+        >
+          <Code className="w-4 h-4" />
+          <span className="hidden sm:inline">debugger</span>
+        </NavLink>
+      )}
 
-      <NavLink
-        to="/debug"
-        className={({ isActive }) =>
-          `flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-mono tracking-wide border transition ${
-            isActive
-              ? 'text-(--accent2) bg-[rgba(124,111,247,0.06)] border-[rgba(124,111,247,0.25)]'
-              : 'text-(--accent2) bg-[rgba(124,111,247,0.06)] border-[rgba(124,111,247,0.25)] hover:bg-[rgba(124,111,247,0.12)]'
-          }`
-        }
-        onClick={() => setMobileOpen(false)}
+      <button
+        onClick={logout}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition text-red-500 hover:bg-red-500/10"
       >
-        <Code className="w-4 h-4" />
-        <span className="hidden sm:inline">debugger</span>
-      </NavLink>
+        <LogOut className="w-4 h-4" />
+        <span className="hidden sm:inline">Logout</span>
+      </button>
 
       <Link
         to="/help"
         onClick={() => setMobileOpen(false)}
-        className="text-blue-500 text-xs underline"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold transition text-(--accent) hover:bg-(--accent)/10"
       >
         Help
       </Link>
@@ -202,7 +230,24 @@ const AppNav: React.FC = () => {
 
         {/* User profile */}
         <div className="ml-auto flex items-center gap-2">
-          <div className="p-1 bg-gray-50 rounded-lg flex items-center gap-2">
+          <div className="hidden xl:flex flex-col items-end rounded-lg border border-(--border-hi) bg-(--surface) px-3 py-1.5">
+            <span className="text-[9px] uppercase tracking-wider text-(--muted)">
+              {isConnecting
+                ? 'Connecting wallet'
+                : walletName
+                  ? `${walletName} connected`
+                  : 'Wallet'}
+            </span>
+            <span className="text-[11px] font-mono text-(--accent)">
+              {address ? `${address.slice(0, 6)}...${address.slice(-4)}` : 'Not connected'}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="p-1 rounded-lg flex items-center gap-2 cursor-pointer border border-(--border-hi) bg-(--surface) hover:bg-(--surface-hi) transition"
+            onClick={() => setIsProfileEditorOpen(true)}
+            title="Edit profile photo"
+          >
             <Avatar
               email={currentUser.email}
               name={currentUser.name}
@@ -210,10 +255,10 @@ const AppNav: React.FC = () => {
               size="sm"
             />
             <div className="hidden md:block flex-1 min-w-0">
-              <p className="text-[10px] font-semibold text-gray-800 truncate">{currentUser.name}</p>
-              <p className="text-[10px] text-gray-500 truncate">{currentUser.email}</p>
+              <p className="text-[10px] font-semibold text-(--text) truncate">{currentUser.name}</p>
+              <p className="text-[10px] text-(--muted) truncate">{currentUser.email}</p>
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
@@ -221,6 +266,44 @@ const AppNav: React.FC = () => {
       {mobileOpen && (
         <div className="lg:hidden absolute left-0 right-0 top-full z-40 bg-white shadow-lg border-t">
           <div className="px-4 py-3 flex flex-col gap-2">{navLinks}</div>
+        </div>
+      )}
+
+      {isProfileEditorOpen && (
+        <div className="fixed inset-0 z-90 grid place-items-center bg-black/65 backdrop-blur-[2px] p-4">
+          <div className="w-full max-w-sm rounded-xl border border-(--border-hi) bg-(--surface) p-5 shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-(--text)">Profile Picture</h3>
+              <button
+                type="button"
+                className="rounded p-1 text-(--muted) hover:bg-(--surface-hi)"
+                onClick={() => setIsProfileEditorOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <AvatarUpload
+              email={currentUser.email}
+              name={currentUser.name}
+              currentImageUrl={currentUser.imageUrl}
+              label="Upload Profile Photo"
+              onImageUpload={(imageUrl) => {
+                setUserImageUrl(imageUrl);
+                localStorage.setItem('payd:user-avatar', imageUrl);
+                setIsProfileEditorOpen(false);
+              }}
+            />
+            <button
+              type="button"
+              className="mt-4 w-full rounded border border-(--border-hi) px-3 py-2 text-sm text-(--text) hover:bg-(--surface-hi) transition"
+              onClick={() => {
+                setUserImageUrl(undefined);
+                localStorage.removeItem('payd:user-avatar');
+              }}
+            >
+              Remove Custom Photo
+            </button>
+          </div>
         </div>
       )}
     </nav>

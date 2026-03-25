@@ -1,9 +1,10 @@
-import { pool } from '../config/database';
+import { pool } from '../config/database.js';
 import {
   CreateEmployeeInput,
   UpdateEmployeeInput,
   EmployeeQueryInput,
-} from '../schemas/employeeSchema';
+} from '../schemas/employeeSchema.js';
+import { WebhookService, WEBHOOK_EVENTS } from './webhook.service.js';
 
 export class EmployeeService {
   async create(data: CreateEmployeeInput, dbClient?: any) {
@@ -19,13 +20,43 @@ export class EmployeeService {
       status,
       base_salary,
       base_currency,
+      phone,
+      address_line1,
+      address_line2,
+      city,
+      state_province,
+      postal_code,
+      country,
+      job_title,
+      hire_date,
+      date_of_birth,
+      emergency_contact_name,
+      emergency_contact_phone,
+      withdrawal_preference,
+      bank_name,
+      bank_account_number,
+      bank_routing_number,
+      mobile_money_provider,
+      mobile_money_account,
+      notes,
     } = data;
 
     const query = `
       INSERT INTO employees (
-        organization_id, first_name, last_name, email, wallet_address, position, department, status, base_salary, base_currency
+        organization_id, first_name, last_name, email, wallet_address,
+        position, department, status, base_salary, base_currency,
+        phone, address_line1, address_line2, city, state_province,
+        postal_code, country, job_title, hire_date, date_of_birth,
+        emergency_contact_name, emergency_contact_phone,
+        withdrawal_preference, bank_name, bank_account_number,
+        bank_routing_number, mobile_money_provider, mobile_money_account,
+        notes
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+        $21, $22, $23, $24, $25, $26, $27, $28, $29
+      )
       RETURNING *;
     `;
 
@@ -40,10 +71,47 @@ export class EmployeeService {
       status || 'active',
       base_salary || 0,
       base_currency || 'USDC',
+      phone || null,
+      address_line1 || null,
+      address_line2 || null,
+      city || null,
+      state_province || null,
+      postal_code || null,
+      country || null,
+      job_title || null,
+      hire_date || null,
+      date_of_birth || null,
+      emergency_contact_name || null,
+      emergency_contact_phone || null,
+      withdrawal_preference || 'bank',
+      bank_name || null,
+      bank_account_number || null,
+      bank_routing_number || null,
+      mobile_money_provider || null,
+      mobile_money_account || null,
+      notes || null,
     ];
 
     const result = await executor.query(query, values);
-    return result.rows[0];
+    const employee = result.rows[0];
+
+    EmployeeService.dispatchWebhook(organization_id, WEBHOOK_EVENTS.EMPLOYEE_ADDED, employee).catch(
+      (err: any) => console.error('Failed to dispatch employee.added webhook:', err)
+    );
+
+    return employee;
+  }
+
+  private static async dispatchWebhook(
+    organization_id: number,
+    eventType: string,
+    payload: any
+  ): Promise<void> {
+    try {
+      await WebhookService.dispatch(eventType, organization_id, payload);
+    } catch (error) {
+      console.error(`Webhook dispatch failed for ${eventType}:`, error);
+    }
   }
 
   async findAll(organization_id: number, params: EmployeeQueryInput) {
@@ -74,12 +142,13 @@ export class EmployeeService {
     }
 
     if (search) {
-      // Use full-text search vector if possible, or ILIKE for simplicity
       query += ` AND (
         first_name ILIKE $${paramIndex} OR
         last_name ILIKE $${paramIndex} OR
         email ILIKE $${paramIndex} OR
-        position ILIKE $${paramIndex}
+        position ILIKE $${paramIndex} OR
+        job_title ILIKE $${paramIndex} OR
+        phone ILIKE $${paramIndex}
       )`;
       values.push(`%${search}%`);
       paramIndex++;
@@ -140,7 +209,17 @@ export class EmployeeService {
     `;
 
     const result = await pool.query(query, values);
-    return result.rows[0] || null;
+    const employee = result.rows[0] || null;
+
+    if (employee) {
+      EmployeeService.dispatchWebhook(
+        organization_id,
+        WEBHOOK_EVENTS.EMPLOYEE_UPDATED,
+        employee
+      ).catch((err: any) => console.error('Failed to dispatch employee.updated webhook:', err));
+    }
+
+    return employee;
   }
 
   async delete(id: number, organization_id: number) {
@@ -151,7 +230,17 @@ export class EmployeeService {
       RETURNING *;
     `;
     const result = await pool.query(query, [id, organization_id]);
-    return result.rows[0] || null;
+    const employee = result.rows[0] || null;
+
+    if (employee) {
+      EmployeeService.dispatchWebhook(
+        organization_id,
+        WEBHOOK_EVENTS.EMPLOYEE_DELETED,
+        employee
+      ).catch((err: any) => console.error('Failed to dispatch employee.deleted webhook:', err));
+    }
+
+    return employee;
   }
 }
 

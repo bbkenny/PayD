@@ -1,10 +1,14 @@
-import { Icon } from '@stellar/design-system';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../providers/AuthContext';
 
 export default function Home() {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { user, isAuthenticated } = useAuth();
+
+  const isEmployer = user?.role === 'employer';
+  const isEmployee = user?.role === 'employee';
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] text-center px-6 py-12">
@@ -27,22 +31,44 @@ export default function Home() {
       </p>
 
       <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-6">
-        <button
-          className="px-8 py-4 bg-accent text-bg font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-accent/20"
-          onClick={() => {
-            void navigate('/payroll');
-          }}
-        >
-          {t('home.ctaManagePayroll')}
-        </button>
-        <button
-          className="px-8 py-4 glass border-hi text-text font-bold rounded-xl hover:bg-white/5 transition-all outline-none"
-          onClick={() => {
-            void navigate('/employee');
-          }}
-        >
-          {t('home.ctaViewEmployees')}
-        </button>
+        {!isAuthenticated && (
+          <button
+            className="px-8 py-4 bg-accent text-bg font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-accent/20"
+            onClick={() => void navigate('/login')}
+          >
+            Get Started
+          </button>
+        )}
+
+        {isEmployer && (
+          <>
+            <button
+              className="px-8 py-4 bg-accent text-bg font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-accent/20"
+              onClick={() => {
+                void navigate('/payroll');
+              }}
+            >
+              {t('home.ctaManagePayroll')}
+            </button>
+            <button
+              className="px-8 py-4 glass border-hi text-text font-bold rounded-xl hover:bg-white/5 transition-all outline-none"
+              onClick={() => {
+                void navigate('/employee');
+              }}
+            >
+              {t('home.ctaViewEmployees')}
+            </button>
+          </>
+        )}
+
+        {isEmployee && (
+          <button
+            className="px-8 py-4 bg-accent text-bg font-bold rounded-xl hover:scale-105 transition-transform shadow-lg shadow-accent/20"
+            onClick={() => void navigate('/portal')}
+          >
+            Go to My Portal
+          </button>
+        )}
       </div>
 
       <div className="mt-24 grid grid-cols-1 md:grid-cols-3 gap-6 text-left max-w-6xl w-full">
